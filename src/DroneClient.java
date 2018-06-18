@@ -31,7 +31,8 @@ public class DroneClient {
     private byte[] commandBuf;
     private byte[] telemetryBuf;
 
-    private boolean connectionStarted = false;
+    private boolean connectionStarted;
+    private boolean telemetryActive;
 
 
     public void DroneClient(String ip, int telemetryPort, int commandPort) throws UnknownHostException, SocketException {
@@ -43,40 +44,83 @@ public class DroneClient {
         this.telemetryBuf = new byte[40];
         this.address = InetAddress.getByName(ip);
         this.commandSock = new DatagramSocket(commandPort);
+        this.connectionStarted = false;
+        this.telemetryActive = false;
     }
 
-    public void startConnection () throws IOException {
-
-        byte[] response = new byte[40];
+    public void startConnection () {
 
         if (!this.connectionStarted) {
+
+            byte[] response;
 
             short[] data = new short[]{0};
 
             DatagramPacket packet = this.createPackage((short) START_CONNECTION, (short)1, data);
-            this.commandSock.send(packet);
+            try {
+                this.commandSock.send(packet);
 
-            long startTime = System.nanoTime();
+                long startTime = System.nanoTime();
 
-            while (!this.connectionStarted || System.nanoTime() - startTime >= 5) {
-                commandSock.receive(packet);
-                response = packet.getData();
-                if (packet != null) {
+                while (!this.connectionStarted || System.nanoTime() - startTime >= 5) {
+                    commandSock.receive(packet);
+                    response = packet.getData();
+                    if (packet != null) {
 
-                    if (this.getCode(response) == START_CONNECTION) {
-                        this.connectionStarted = true;
+                        if (this.getCode(response) == START_CONNECTION) {
+                            this.connectionStarted = true;
+                        }
                     }
                 }
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+
         }
     }
 
-    public void setRc(short roll, short pitch, short yaw, short throttle) throws IOException {
+    public void setRc(short roll, short pitch, short yaw, short throttle) {
 
         short[] data = new short[]{roll, pitch, yaw, throttle};
 
         DatagramPacket packet = this.createPackage((short)SET_RC, (short)8, data);
+        try {
+            this.commandSock.send(packet);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+    }
+
+    public void startTelemetry () {
+
+        if (!this.telemetryActive) {
+
+            DatagramPacket packet = this.createPackage((short)START_TELEMETRY, (short)0, new short[]{0});
+            try {
+
+                byte[] response;
+
+                this.commandSock.send(packet);
+
+                long startTime = System.nanoTime();
+
+                while (!this.telemetryActive || System.nanoTime() - startTime >= 5) {
+                    commandSock.receive(packet);
+                    response = packet.getData();
+                    if (packet != null) {
+
+                        if (this.getCode(response) == START_TELEMETRY) {
+                            this.telemetryActive = true;
+                        }
+                    }
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
     }
 
@@ -96,18 +140,16 @@ public class DroneClient {
         return packet;
     }
 
-    private int getShort(byte[] arr, int off) {
-        return arr[off]<<8 &0xFF00 | arr[off+1]&0xFF;
+    private short getShort(byte[] arr, int off) {
+        return (short) (arr[off]<<8 &0xFF00 | arr[off+1]&0xFF);
     }
 
-    private int getCode(byte[] response) {
+    private short getCode(byte[] response) {
         return this.getShort(response, 0);
     }
 
-
-
-
-
-
+    private short getSize(byte[] response) {
+        return this.getShort(response, 2);
+    }
 
 }
