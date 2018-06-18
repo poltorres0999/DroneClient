@@ -1,9 +1,24 @@
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 
 public class DroneClient {
+
+
+    private static final int START_CONNECTION = 300;
+    private static final int END_CONNECTION = 301;
+    private static final int ARM = 220;
+    private static final int DISARM = 221;
+    private static final int START_TELEMETRY = 120;
+    private static final int END_TELEMETRY = 121;
+    private static final int RAW_IMU = 102;
+    private static final int SERVO = 103;
+    private static final int MOTOR = 104;
+    private static final int RC = 105;
+    private static final int ATTITUDE = 108;
+    private static final int ALTITUDE = 109;
+    private static final int SET_RC = 200;
 
     private String ip;
     private int telemetryPort;
@@ -36,17 +51,19 @@ public class DroneClient {
 
         if (!this.connectionStarted) {
 
-            this.createPackage(300,1,0);
+            short[] data = new short[]{0};
 
-            DatagramPacket packet = new DatagramPacket(this.commandBuf, this.commandBuf.length);
+            DatagramPacket packet = this.createPackage((short) START_CONNECTION, (short)1, data);
+            this.commandSock.send(packet);
+
             long startTime = System.nanoTime();
 
-            while (!this.connectionStarted || System.nanoTime() - startTime > 5) {
+            while (!this.connectionStarted || System.nanoTime() - startTime >= 5) {
                 commandSock.receive(packet);
                 response = packet.getData();
                 if (packet != null) {
 
-                    if (this.getCode(response) == 300) {
+                    if (this.getCode(response) == START_CONNECTION) {
                         this.connectionStarted = true;
                     }
                 }
@@ -54,32 +71,37 @@ public class DroneClient {
         }
     }
 
-    public void setRc() throws IOException {
+    public void setRc(short roll, short pitch, short yaw, short throttle) throws IOException {
+
+        short[] data = new short[]{roll, pitch, yaw, throttle};
+
+        DatagramPacket packet = this.createPackage((short)SET_RC, (short)8, data);
+
 
     }
 
-    private DatagramPacket createPackage(int code, int size, int data) {
+    private DatagramPacket createPackage(short code, short size, short[] data) {
 
-        int[] packageData = new int []{code, size, data};
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(packageData.length * 4);
-        IntBuffer intBuffer = byteBuffer.asIntBuffer();
-        intBuffer.put(packageData);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(4 + size * 2);
+        ShortBuffer shortBuffer = byteBuffer.asShortBuffer();
+        shortBuffer.put(code);
+        shortBuffer.put(size);
+        shortBuffer.put(data);
 
         this.commandBuf = byteBuffer.array();
 
-        DatagramPacket packet = new DatagramPacket(this.commandBuf, this.commandBuf.length, this.address, 4445);
+        DatagramPacket packet = new DatagramPacket(this.commandBuf, this.commandBuf.length,
+                this.address, this.commandPort);
 
         return packet;
-
     }
 
-    private int getInt(byte[] arr, int off) {
+    private int getShort(byte[] arr, int off) {
         return arr[off]<<8 &0xFF00 | arr[off+1]&0xFF;
     }
 
     private int getCode(byte[] response) {
-        return this.getInt(response, 0);
+        return this.getShort(response, 0);
     }
 
 
