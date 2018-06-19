@@ -2,23 +2,24 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
+import java.util.Arrays;
 
 public class DroneClient {
 
 
-    private static final int START_CONNECTION = 300;
-    private static final int END_CONNECTION = 301;
-    private static final int ARM = 220;
-    private static final int DISARM = 221;
-    private static final int START_TELEMETRY = 120;
-    private static final int END_TELEMETRY = 121;
-    private static final int RAW_IMU = 102;
-    private static final int SERVO = 103;
-    private static final int MOTOR = 104;
-    private static final int RC = 105;
-    private static final int ATTITUDE = 108;
-    private static final int ALTITUDE = 109;
-    private static final int SET_RC = 200;
+    private static final short START_CONNECTION = 300;
+    private static final short END_CONNECTION = 301;
+    private static final short ARM = 220;
+    private static final short DISARM = 221;
+    private static final short START_TELEMETRY = 120;
+    private static final short END_TELEMETRY = 121;
+    private static final short RAW_IMU = 102;
+    private static final short SERVO = 103;
+    private static final short MOTOR = 104;
+    private static final short RC = 105;
+    private static final short ATTITUDE = 108;
+    private static final short ALTITUDE = 109;
+    private static final short SET_RC = 200;
 
     private String ip;
     private int telemetryPort;
@@ -56,7 +57,7 @@ public class DroneClient {
 
             short[] data = new short[]{0};
 
-            DatagramPacket packet = this.createPackage((short) START_CONNECTION, (short)1, data);
+            DatagramPacket packet = this.createPackage(START_CONNECTION, (short)1, data);
             try {
                 this.commandSock.send(packet);
 
@@ -83,7 +84,7 @@ public class DroneClient {
     public void EndConnection() {
 
         if (this.connectionStarted) {
-            DatagramPacket packet = this.createPackage((short)END_CONNECTION, (short)0, new short[]{0});
+            DatagramPacket packet = this.createPackage(END_CONNECTION, (short)0, new short[]{0});
             try {
                 this.commandSock.send(packet);
             } catch (IOException e) {
@@ -96,7 +97,7 @@ public class DroneClient {
 
         short[] data = new short[]{roll, pitch, yaw, throttle};
 
-        DatagramPacket packet = this.createPackage((short)SET_RC, (short)8, data);
+        DatagramPacket packet = this.createPackage(SET_RC, (short)8, data);
         try {
             this.commandSock.send(packet);
         } catch (IOException e) {
@@ -109,7 +110,7 @@ public class DroneClient {
 
         if (!this.telemetryActive) {
 
-            DatagramPacket packet = this.createPackage((short)START_TELEMETRY, (short)0, new short[]{0});
+            DatagramPacket packet = this.createPackage(START_TELEMETRY, (short)0, new short[]{0});
             try {
 
                 byte[] response;
@@ -121,11 +122,29 @@ public class DroneClient {
                 while (!this.telemetryActive || System.nanoTime() - startTime >= 5) {
                     commandSock.receive(packet);
                     response = packet.getData();
-                    if (packet != null) {
+                    if (response != null) {
 
                         if (this.getCode(response) == START_TELEMETRY) {
                             this.telemetryActive = true;
                         }
+                    }
+                }
+
+                if (this.telemetryActive) {
+
+                    DatagramPacket telemetryPacket = new DatagramPacket(this.telemetryBuf, this.commandBuf.length,
+                            this.address, this.telemetryPort);
+
+                    commandSock.receive(telemetryPacket);
+                    byte[] telemetryResponse = telemetryPacket.getData();
+
+                    if (telemetryResponse != null) {
+
+                        short code = this.getCode(telemetryResponse);
+                        short size = this.getSize(telemetryResponse);
+                        byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
+
+                        this.evaluateTelemetry(code,size,data);
                     }
                 }
 
@@ -166,7 +185,42 @@ public class DroneClient {
 
     private void evaluateTelemetry(short code, short size, byte[] data) {
 
+        if (code == RAW_IMU) {
+            short[] rawImu = this.getTelemetryValues(size, data);
+        }
 
+        if (code == SERVO) {
+            short[] servo = this.getTelemetryValues(size, data);
+        }
+
+        if (code == MOTOR) {
+            short[] motor = this.getTelemetryValues(size, data);
+        }
+
+        if (code == RC) {
+            short[] rc = this.getTelemetryValues(size, data);
+        }
+
+        if (code == ATTITUDE) {
+            short[] attitude = this.getTelemetryValues(size, data);
+        }
+
+        if (code == ALTITUDE) {
+            short[] altitude = this.getTelemetryValues(size, data);
+        }
+
+    }
+
+    private short[] getTelemetryValues(short size, byte[] data) {
+
+        int j = 0;
+        short[] values = new short[size];
+        for (int i = 0; i < size; i+=2) {
+            values[j] = this.getShort(data,i);
+            j++;
+        }
+
+        return values;
 
     }
 
@@ -181,14 +235,5 @@ public class DroneClient {
     private short getSize(byte[] response) {
         return this.getShort(response, 2);
     }
-
-
-    private short[] getTelemtryValues(short size, byte[] data) {
-
-
-
-    }
-
-
 
 }
