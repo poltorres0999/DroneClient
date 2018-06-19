@@ -167,22 +167,6 @@ public class DroneClient {
         }
     }
 
-    private DatagramPacket createPackage(short code, short size, short[] data) {
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(4 + size * 2);
-        ShortBuffer shortBuffer = byteBuffer.asShortBuffer();
-        shortBuffer.put(code);
-        shortBuffer.put(size);
-        shortBuffer.put(data);
-
-        this.commandBuf = byteBuffer.array();
-
-        DatagramPacket packet = new DatagramPacket(this.commandBuf, this.commandBuf.length,
-                this.address, this.commandPort);
-
-        return packet;
-    }
-
     private void evaluateTelemetry(short code, short size, byte[] data) {
 
         if (code == RAW_IMU) {
@@ -209,6 +193,22 @@ public class DroneClient {
             short[] altitude = this.getTelemetryValues(size, data);
         }
 
+    }
+
+    private DatagramPacket createPackage(short code, short size, short[] data) {
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(4 + size * 2);
+        ShortBuffer shortBuffer = byteBuffer.asShortBuffer();
+        shortBuffer.put(code);
+        shortBuffer.put(size);
+        shortBuffer.put(data);
+
+        this.commandBuf = byteBuffer.array();
+
+        DatagramPacket packet = new DatagramPacket(this.commandBuf, this.commandBuf.length,
+                this.address, this.commandPort);
+
+        return packet;
     }
 
     private short[] getTelemetryValues(short size, byte[] data) {
