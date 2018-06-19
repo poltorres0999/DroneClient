@@ -6,7 +6,6 @@ import java.util.Arrays;
 
 public class DroneClient {
 
-
     private static final short START_CONNECTION = 300;
     private static final short END_CONNECTION = 301;
     private static final short ARM = 220;
@@ -224,16 +223,16 @@ public class DroneClient {
 
     }
 
-    private short getShort(byte[] arr, int off) {
-        return (short) (arr[off]<<8 &0xFF00 | arr[off+1]&0xFF);
-    }
-
     private short getCode(byte[] response) {
         return this.getShort(response, 0);
     }
 
     private short getSize(byte[] response) {
         return this.getShort(response, 2);
+    }
+
+    private short getShort(byte[] arr, int off) {
+        return (short) (arr[off]<<8 &0xFF00 | arr[off+1]&0xFF);
     }
 
 }
