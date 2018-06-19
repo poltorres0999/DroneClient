@@ -80,6 +80,18 @@ public class DroneClient {
         }
     }
 
+    public void EndConnection() {
+
+        if (this.connectionStarted) {
+            DatagramPacket packet = this.createPackage((short)END_CONNECTION, (short)0, new short[]{0});
+            try {
+                this.commandSock.send(packet);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     public void setRc(short roll, short pitch, short yaw, short throttle) {
 
         short[] data = new short[]{roll, pitch, yaw, throttle};
@@ -124,6 +136,18 @@ public class DroneClient {
 
     }
 
+    public void stopTelemetry() {
+
+        if (this.telemetryActive) {
+            DatagramPacket packet = this.createPackage((short)END_TELEMETRY, (short)0, new short[]{0});
+            try {
+                this.commandSock.send(packet);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private DatagramPacket createPackage(short code, short size, short[] data) {
 
         ByteBuffer byteBuffer = ByteBuffer.allocate(4 + size * 2);
@@ -140,6 +164,12 @@ public class DroneClient {
         return packet;
     }
 
+    private void evaluateTelemetry(short code, short size, byte[] data) {
+
+
+
+    }
+
     private short getShort(byte[] arr, int off) {
         return (short) (arr[off]<<8 &0xFF00 | arr[off+1]&0xFF);
     }
@@ -151,5 +181,14 @@ public class DroneClient {
     private short getSize(byte[] response) {
         return this.getShort(response, 2);
     }
+
+
+    private short[] getTelemtryValues(short size, byte[] data) {
+
+
+
+    }
+
+
 
 }
