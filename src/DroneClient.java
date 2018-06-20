@@ -34,6 +34,8 @@ public class DroneClient {
     private boolean connectionStarted;
     private boolean telemetryActive;
 
+    private TelemetryThread telemetryThread;
+
 
     public void DroneClient(String ip, int telemetryPort, int commandPort) throws UnknownHostException, SocketException {
 
@@ -60,6 +62,8 @@ public class DroneClient {
             try {
                 this.commandSock.send(packet);
 
+                System.out.println("Start connection command sent");
+
                 long startTime = System.nanoTime();
 
                 while (!this.connectionStarted || System.nanoTime() - startTime >= 5) {
@@ -67,8 +71,11 @@ public class DroneClient {
                     response = packet.getData();
                     if (packet != null) {
 
+                        System.out.println(new String(packet.getData(), 0, packet.getLength()));
+
                         if (this.getCode(response) == START_CONNECTION) {
                             this.connectionStarted = true;
+                            System.out.println("Connection started!");
                         }
                     }
                 }
@@ -99,6 +106,8 @@ public class DroneClient {
         DatagramPacket packet = this.createPackage(SET_RC, (short)8, data);
         try {
             this.commandSock.send(packet);
+            System.out.println("Set_rc command sent\n");
+            System.out.format("Values -> roll: %h, pitch: %h, yaw: %h, throttle: %h", roll, pitch , yaw, throttle);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -115,12 +124,13 @@ public class DroneClient {
                 byte[] response;
 
                 this.commandSock.send(packet);
-
+                System.out.println("Start telemetry command sent\n");
                 long startTime = System.nanoTime();
 
                 while (!this.telemetryActive || System.nanoTime() - startTime >= 5) {
                     commandSock.receive(packet);
                     response = packet.getData();
+                    System.out.print("Waiting for telemetry response...\n");
                     if (response != null) {
 
                         if (this.getCode(response) == START_TELEMETRY) {
@@ -131,20 +141,8 @@ public class DroneClient {
 
                 if (this.telemetryActive) {
 
-                    DatagramPacket telemetryPacket = new DatagramPacket(this.telemetryBuf, this.commandBuf.length,
-                            this.address, this.telemetryPort);
-
-                    commandSock.receive(telemetryPacket);
-                    byte[] telemetryResponse = telemetryPacket.getData();
-
-                    if (telemetryResponse != null) {
-
-                        short code = this.getCode(telemetryResponse);
-                        short size = this.getSize(telemetryResponse);
-                        byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
-
-                        this.evaluateTelemetry(code,size,data);
-                    }
+                    this.telemetryThread = new TelemetryThread();
+                    this.telemetryThread.start();
                 }
 
             } catch (IOException e) {
@@ -160,6 +158,7 @@ public class DroneClient {
             DatagramPacket packet = this.createPackage((short)END_TELEMETRY, (short)0, new short[]{0});
             try {
                 this.commandSock.send(packet);
+                System.out.println("Stop telemetry command sent");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -170,26 +169,44 @@ public class DroneClient {
 
         if (code == RAW_IMU) {
             short[] rawImu = this.getTelemetryValues(size, data);
+
+            System.out.println("-----RAW_IMU-----\n");
+            System.out.format("ACC -> accx: %h, accy: %h, accy: %h\n", rawImu[0], rawImu[1], rawImu[2]);
+            System.out.format("GYRO -> gyrx: %h, gyry: %h, gyrz: %h\n", rawImu[3], rawImu[4], rawImu[5]);
+            System.out.format("MAG -> magx: %h, magy: %h, magz: %h\n", rawImu[6], rawImu[7], rawImu[8]);
+
         }
 
         if (code == SERVO) {
             short[] servo = this.getTelemetryValues(size, data);
+
+            System.out.println("-----SERVO-----\n");
+            System.out.format("SERVOS -> s1: %h, s2: %h, s3: %h, s4: %h\n", servo[0], servo[1], servo[2], servo[3]);
+
         }
 
         if (code == MOTOR) {
             short[] motor = this.getTelemetryValues(size, data);
+            System.out.println("-----MOTOR-----\n");
+            System.out.format("MOTORS -> m1: %h, m2: %h, m3: %h, m4: %h\n", motor[0], motor[1], motor[2], motor[3]);
         }
 
         if (code == RC) {
             short[] rc = this.getTelemetryValues(size, data);
+            System.out.println("-----RC-----\n");
+            System.out.format("RC -> roll: %h, pitch: %h, yaw: %h, throttle: %h\n", rc[0], rc[1], rc[2], rc[3]);
         }
 
         if (code == ATTITUDE) {
             short[] attitude = this.getTelemetryValues(size, data);
+            System.out.println("-----ATTITUDE-----\n");
+            System.out.format("ALTITUDE -> angx: %h, angy: %h, heading: %h\n", attitude[0], attitude[1], attitude[2]);
         }
 
         if (code == ALTITUDE) {
             short[] altitude = this.getTelemetryValues(size, data);
+            System.out.println("-----ALTITUDE-----\n");
+            System.out.format("ALTITUDE -> estalt: %h, vario: %h\n", altitude[0], altitude[1]);
         }
 
     }
@@ -201,6 +218,8 @@ public class DroneClient {
         shortBuffer.put(code);
         shortBuffer.put(size);
         shortBuffer.put(data);
+
+        System.out.println("Package created, values: " + byteBuffer.toString());
 
         this.commandBuf = byteBuffer.array();
 
@@ -235,4 +254,41 @@ public class DroneClient {
         return (short) (arr[off]<<8 &0xFF00 | arr[off+1]&0xFF);
     }
 
+    private class TelemetryThread implements Runnable {
+
+        private Thread t;
+
+        @Override
+        public void run() {
+
+            DatagramPacket telemetryPacket = new DatagramPacket(telemetryBuf, commandBuf.length,
+                    address, telemetryPort);
+
+            try {
+                commandSock.receive(telemetryPacket);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            byte[] telemetryResponse = telemetryPacket.getData();
+
+            if (telemetryResponse != null) {
+
+                short code = getCode(telemetryResponse);
+                short size = getSize(telemetryResponse);
+                byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
+
+                evaluateTelemetry(code,size,data);
+            }
+
+        }
+
+        public void start () {
+            System.out.println("Starting telemetry thread...");
+            if (t == null) {
+                t = new Thread (this);
+                t.start ();
+            }
+        }
+    }
 }
