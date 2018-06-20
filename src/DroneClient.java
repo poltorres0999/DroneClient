@@ -90,28 +90,13 @@ public class DroneClient {
     public void EndConnection() {
 
         if (this.connectionStarted) {
-            DatagramPacket packet = this.createPackage(END_CONNECTION, (short)0, new short[]{0});
+            DatagramPacket packet = this.createPackage(END_CONNECTION, (short)1, new short[]{0});
             try {
                 this.commandSock.send(packet);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-    }
-
-    public void setRc(short roll, short pitch, short yaw, short throttle) {
-
-        short[] data = new short[]{roll, pitch, yaw, throttle};
-
-        DatagramPacket packet = this.createPackage(SET_RC, (short)8, data);
-        try {
-            this.commandSock.send(packet);
-            System.out.println("Set_rc command sent\n");
-            System.out.format("Values -> roll: %h, pitch: %h, yaw: %h, throttle: %h", roll, pitch , yaw, throttle);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
     }
 
     public void startTelemetry () {
@@ -209,6 +194,42 @@ public class DroneClient {
             System.out.format("ALTITUDE -> estalt: %h, vario: %h\n", altitude[0], altitude[1]);
         }
 
+    }
+
+    public void setRc(short roll, short pitch, short yaw, short throttle) {
+
+        short[] data = new short[]{roll, pitch, yaw, throttle};
+
+        DatagramPacket packet = this.createPackage(SET_RC, (short)8, data);
+        try {
+            this.commandSock.send(packet);
+            System.out.println("Set_rc command sent\n");
+            System.out.format("Values -> roll: %h, pitch: %h, yaw: %h, throttle: %h", roll, pitch , yaw, throttle);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void ARM () {
+
+        DatagramPacket packet = this.createPackage(ARM, (short)1, new short[]{0});
+        try {
+            this.commandSock.send(packet);
+            System.out.println("ARM command sent\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void DISARM () {
+
+        DatagramPacket packet = this.createPackage(DISARM, (short)1, new short[]{0});
+        try {
+            this.commandSock.send(packet);
+            System.out.println("DISARM command sent\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private DatagramPacket createPackage(short code, short size, short[] data) {
