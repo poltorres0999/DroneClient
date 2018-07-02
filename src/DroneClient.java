@@ -37,7 +37,7 @@ public class DroneClient {
     private TelemetryThread telemetryThread;
 
 
-    public void DroneClient(String ip, int telemetryPort, int commandPort) throws UnknownHostException, SocketException {
+    public DroneClient(String ip, int commandPort, int telemetryPort) throws UnknownHostException, SocketException {
 
         this.ip = ip;
         this.telemetryPort = telemetryPort;
@@ -87,7 +87,7 @@ public class DroneClient {
         }
     }
 
-    public void EndConnection() {
+    public void endConnection() {
 
         if (this.connectionStarted) {
             DatagramPacket packet = this.createPackage(END_CONNECTION, (short)1, new short[]{0});
@@ -140,10 +140,12 @@ public class DroneClient {
     public void stopTelemetry() {
 
         if (this.telemetryActive) {
-            DatagramPacket packet = this.createPackage((short)END_TELEMETRY, (short)0, new short[]{0});
+            DatagramPacket packet = this.createPackage(END_TELEMETRY, (short)0, new short[]{0});
             try {
                 this.commandSock.send(packet);
                 System.out.println("Stop telemetry command sent");
+                telemetrySock.close();
+                this.telemetryActive = false;
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -282,26 +284,30 @@ public class DroneClient {
         @Override
         public void run() {
 
-            DatagramPacket telemetryPacket = new DatagramPacket(telemetryBuf, commandBuf.length,
-                    address, telemetryPort);
-
             try {
-                commandSock.receive(telemetryPacket);
+
+                telemetrySock = new DatagramSocket(telemetryPort);
+
+                DatagramPacket telemetryPacket = new DatagramPacket(telemetryBuf, telemetryBuf.length,
+                        address, telemetryPort);
+
+                telemetrySock.receive(telemetryPacket);
+
+                byte[] telemetryResponse = telemetryPacket.getData();
+
+                if (telemetryResponse != null) {
+
+                    short code = getCode(telemetryResponse);
+                    short size = getSize(telemetryResponse);
+                    byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
+
+                    evaluateTelemetry(code, size, data);
+                }
+
             } catch (IOException e) {
                 e.printStackTrace();
+
             }
-
-            byte[] telemetryResponse = telemetryPacket.getData();
-
-            if (telemetryResponse != null) {
-
-                short code = getCode(telemetryResponse);
-                short size = getSize(telemetryResponse);
-                byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
-
-                evaluateTelemetry(code,size,data);
-            }
-
         }
 
         public void start () {
