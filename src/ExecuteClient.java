@@ -28,7 +28,15 @@ public class ExecuteClient {
         long startTime = System.nanoTime();
 
         while (System.nanoTime() - startTime >= 10) {
-            droneClient.setRc((short)(roll+2), (short)(pitch+2), (short)(yaw+2), (short)(throttle+2));
+
+
+            droneClient.setRc(roll, pitch, yaw, throttle);
+
+            roll += 2;
+            pitch += 2;
+            yaw += 2;
+            throttle +=2;
+
             Thread.sleep(200);
         }
 

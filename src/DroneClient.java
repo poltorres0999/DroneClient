@@ -117,7 +117,7 @@ public class DroneClient {
                 System.out.println("Start telemetry command sent\n");
                 long startTime = System.nanoTime();
 
-                while (!this.telemetryActive || System.nanoTime() - startTime >= 5) {
+                while (!this.telemetryActive) {
                     commandSock.receive(packet);
                     response = packet.getData();
                     System.out.print("Waiting for telemetry response...\n");
@@ -297,12 +297,11 @@ public class DroneClient {
 
                 telemetrySock = new DatagramSocket(telemetryPort);
 
-                DatagramPacket telemetryPacket = new DatagramPacket(telemetryBuf, telemetryBuf.length,
-                        address, telemetryPort);
+                DatagramPacket receivePacket = new DatagramPacket(telemetryBuf, telemetryBuf.length);
 
-                telemetrySock.receive(telemetryPacket);
+                telemetrySock.receive(receivePacket);
 
-                byte[] telemetryResponse = telemetryPacket.getData();
+                byte[] telemetryResponse = receivePacket.getData();
 
                 if (telemetryResponse != null) {
 
