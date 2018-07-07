@@ -7,10 +7,12 @@ import java.util.Arrays;
 public class DroneClient {
 
     private static final short START_CONNECTION = 300;
+    private static final short CONNECTION_ACCEPTED = 302;
     private static final short END_CONNECTION = 301;
     private static final short ARM = 220;
     private static final short DISARM = 221;
     private static final short START_TELEMETRY = 120;
+    private static final short TELEMETRY_ACCEPTED = 122;
     private static final short END_TELEMETRY = 121;
     private static final short RAW_IMU = 102;
     private static final short SERVO = 103;
@@ -45,7 +47,7 @@ public class DroneClient {
         this.commandBuf = new byte[40];
         this.telemetryBuf = new byte[40];
         this.address = InetAddress.getByName(ip);
-        this.commandSock = new DatagramSocket(commandPort);
+        this.commandSock = new DatagramSocket();
         this.connectionStarted = false;
         this.telemetryActive = false;
     }
@@ -58,22 +60,25 @@ public class DroneClient {
 
             short[] data = new short[]{0};
 
-            DatagramPacket packet = this.createPackage(START_CONNECTION, (short)1, data);
+            DatagramPacket packet = this.createPackage(START_CONNECTION, (short)2, data);
+            DatagramPacket receivePacket = new DatagramPacket(this.commandBuf, this.commandBuf.length);
             try {
                 this.commandSock.send(packet);
 
                 System.out.println("Start connection command sent");
 
                 long startTime = System.nanoTime();
+                long currentTime = System.nanoTime();
 
-                while (!this.connectionStarted || System.nanoTime() - startTime >= 5) {
-                    commandSock.receive(packet);
+                while (!this.connectionStarted) {
+                    currentTime = System.nanoTime();
+                    commandSock.receive(receivePacket);
                     response = packet.getData();
                     if (packet != null) {
 
                         System.out.println(new String(packet.getData(), 0, packet.getLength()));
 
-                        if (this.getCode(response) == START_CONNECTION) {
+                        if (this.getCode(response) == CONNECTION_ACCEPTED) {
                             this.connectionStarted = true;
                             System.out.println("Connection started!");
                         }
@@ -90,7 +95,7 @@ public class DroneClient {
     public void endConnection() {
 
         if (this.connectionStarted) {
-            DatagramPacket packet = this.createPackage(END_CONNECTION, (short)1, new short[]{0});
+            DatagramPacket packet = this.createPackage(END_CONNECTION, (short)2, new short[]{0});
             try {
                 this.commandSock.send(packet);
             } catch (IOException e) {
@@ -103,7 +108,7 @@ public class DroneClient {
 
         if (!this.telemetryActive) {
 
-            DatagramPacket packet = this.createPackage(START_TELEMETRY, (short)0, new short[]{0});
+            DatagramPacket packet = this.createPackage(START_TELEMETRY, (short)2, new short[]{0});
             try {
 
                 byte[] response;
@@ -118,8 +123,10 @@ public class DroneClient {
                     System.out.print("Waiting for telemetry response...\n");
                     if (response != null) {
 
-                        if (this.getCode(response) == START_TELEMETRY) {
+                        if (this.getCode(response) == TELEMETRY_ACCEPTED) {
                             this.telemetryActive = true;
+                            System.out.print("Telemetry started!\n");
+
                         }
                     }
                 }
@@ -214,7 +221,7 @@ public class DroneClient {
 
     public void ARM () {
 
-        DatagramPacket packet = this.createPackage(ARM, (short)1, new short[]{0});
+        DatagramPacket packet = this.createPackage(ARM, (short)2, new short[]{0});
         try {
             this.commandSock.send(packet);
             System.out.println("ARM command sent\n");
@@ -225,7 +232,7 @@ public class DroneClient {
 
     public void DISARM () {
 
-        DatagramPacket packet = this.createPackage(DISARM, (short)1, new short[]{0});
+        DatagramPacket packet = this.createPackage(DISARM, (short)2, new short[]{0});
         try {
             this.commandSock.send(packet);
             System.out.println("DISARM command sent\n");
@@ -244,7 +251,9 @@ public class DroneClient {
 
         System.out.println("Package created, values: " + byteBuffer.toString());
 
+
         this.commandBuf = byteBuffer.array();
+        System.out.println(String.valueOf(this.getCode(this.commandBuf)));
 
         DatagramPacket packet = new DatagramPacket(this.commandBuf, this.commandBuf.length,
                 this.address, this.commandPort);

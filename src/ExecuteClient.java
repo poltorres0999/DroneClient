@@ -5,7 +5,7 @@ public class ExecuteClient {
 
     private static final int command_port = 4445;
     private static final int telemetry_port = 4446;
-    private static final String ip = "127.0.0.1";
+    private static final String ip = "192.168.0.162";
 
 
     public static void main (String[] args) throws SocketException, UnknownHostException, InterruptedException {
