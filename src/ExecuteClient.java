@@ -1,5 +1,10 @@
+import sun.plugin.dom.exception.InvalidStateException;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 
 public class ExecuteClient {
 
@@ -7,42 +12,64 @@ public class ExecuteClient {
     private static final int telemetry_port = 4446;
     private static final String ip = "192.168.0.162";
 
-
     public static void main (String[] args) throws SocketException, UnknownHostException, InterruptedException {
+        try(DroneClientServer droneClientServer=new DroneClientServer(new InetSocketAddress(ip,4445))){
+            droneClientServer.setOnTelemetryCallback((telemetryDatagramPacket)->{
+                switch (telemetryDatagramPacket.code){
+                    case 102:
+                        printRawImu(new DroneClientServer.DroneSegment.RawImu(telemetryDatagramPacket.payload));
+                        break;
+                    case 108:
+                        printAttitude(new DroneClientServer.DroneSegment.Attitude(telemetryDatagramPacket.payload));
+                        break;
+                    case 105:
+                        printRc(new DroneClientServer.DroneSegment.Rc(telemetryDatagramPacket.payload));
+                        break;
+                    case 109:
+                        printAltitude(new DroneClientServer.DroneSegment.Altitude(telemetryDatagramPacket.payload));
+                        break;
+                    default:
+                        throw new InvalidStateException("Im fucked");
+                }
 
-
-        short roll = 1500;
-        short pitch = 1500;
-        short yaw = 1500;
-        short throttle = 1500;
-
-        DroneClient droneClient = new DroneClient(ip, command_port, telemetry_port);
-
-        droneClient.startConnection();
-        droneClient.ARM();
-        //Waits until drone is armed to continue sending commands
-        Thread.sleep(5000);
-
-        droneClient.startTelemetry();
-
-        long startTime = System.nanoTime();
-
-        while (System.nanoTime() - startTime >= 10) {
-
-
-            droneClient.setRc(roll, pitch, yaw, throttle);
-
-            roll += 2;
-            pitch += 2;
-            yaw += 2;
-            throttle +=2;
-
-            Thread.sleep(200);
+                System.out.println("CODE: "+telemetryDatagramPacket.code);
+                System.out.println("Size: "+ telemetryDatagramPacket.size);
+                System.out.println("Payload: "+Arrays.toString(telemetryDatagramPacket.payload));
+            });
+            droneClientServer.start();
+            //dronClientServer.sendArm();
+            droneClientServer.startTelemetry();
+            Thread.sleep((long)1000000000);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
-        droneClient.DISARM();
-        droneClient.stopTelemetry();
-        droneClient.endConnection();
+    }
+
+    private static void printAttitude(DroneClientServer.DroneSegment.Attitude attitude) {
+        System.out.println("-----ATTITUDE-----\n");
+        System.out.format("ALTITUDE -> angx: %h, angy: %h, heading: %h\n", attitude.angx, attitude.angy, attitude.heading);
+    }
+
+    private static void printAltitude(DroneClientServer.DroneSegment.Altitude altitude) {
+
+        System.out.println("-----ALTITUDE-----\n");
+        System.out.format("ALTITUDE -> estalt: %h, vario: %h\n", altitude.estalt, altitude.vario);
+
+    }
+
+    private static void printRc(DroneClientServer.DroneSegment.Rc rc) {
+
+        System.out.println("-----RC-----\n");
+        System.out.format("RC -> roll: %h, pitch: %h, yaw: %h, throttle: %h\n", rc.roll, rc.pitch, rc.pitch, rc.yaw);
+    }
+
+    private static void printRawImu(DroneClientServer.DroneSegment.RawImu rawImu) {
+
+        System.out.println("-----RAW_IMU-----\n");
+        System.out.format("ACC -> accx: %h, accy: %h, accy: %h\n", rawImu.accx, rawImu.accy, rawImu.accz);
+        System.out.format("GYRO -> gyrx: %h, gyry: %h, gyrz: %h\n", rawImu.gyrx, rawImu.gyry, rawImu.gyrz);
+        System.out.format("MAG -> magx: %h, magy: %h, magz: %h\n", rawImu.magx, rawImu.magy, rawImu.magz);
 
     }
 

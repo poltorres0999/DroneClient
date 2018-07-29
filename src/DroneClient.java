@@ -3,17 +3,18 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
 import java.util.Arrays;
+import java.util.concurrent.FutureTask;
 
 public class DroneClient {
 
     private static final short START_CONNECTION = 300;
-    private static final short CONNECTION_ACCEPTED = 302;
-    private static final short END_CONNECTION = 301;
+    private static final short CONNECTION_ACCEPTED = 301;
+    private static final short END_CONNECTION = 302;
     private static final short ARM = 220;
     private static final short DISARM = 221;
     private static final short START_TELEMETRY = 120;
-    private static final short TELEMETRY_ACCEPTED = 122;
-    private static final short END_TELEMETRY = 121;
+    private static final short TELEMETRY_ACCEPTED = 121;
+    private static final short END_TELEMETRY = 122;
     private static final short RAW_IMU = 102;
     private static final short SERVO = 103;
     private static final short MOTOR = 104;
@@ -109,16 +110,19 @@ public class DroneClient {
         if (!this.telemetryActive) {
 
             DatagramPacket packet = this.createPackage(START_TELEMETRY, (short)2, new short[]{0});
+
             try {
+
+                //telemetrySock = new DatagramSocket();
+                telemetrySock=commandSock;
 
                 byte[] response;
 
-                this.commandSock.send(packet);
+                this.telemetrySock.send(packet);
                 System.out.println("Start telemetry command sent\n");
-                long startTime = System.nanoTime();
 
                 while (!this.telemetryActive) {
-                    commandSock.receive(packet);
+                    telemetrySock.receive(packet);
                     response = packet.getData();
                     System.out.print("Waiting for telemetry response...\n");
                     if (response != null) {
@@ -147,12 +151,12 @@ public class DroneClient {
     public void stopTelemetry() {
 
         if (this.telemetryActive) {
-            DatagramPacket packet = this.createPackage(END_TELEMETRY, (short)0, new short[]{0});
+            DatagramPacket packet = this.createPackage(END_TELEMETRY, (short)2, new short[]{0});
             try {
                 this.commandSock.send(packet);
                 System.out.println("Stop telemetry command sent");
-                telemetrySock.close();
                 this.telemetryActive = false;
+                telemetrySock.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -286,44 +290,41 @@ public class DroneClient {
         return (short) (arr[off]<<8 &0xFF00 | arr[off+1]&0xFF);
     }
 
-    private class TelemetryThread implements Runnable {
-
-        private Thread t;
+    private class TelemetryThread extends Thread {
 
         @Override
         public void run() {
 
-            try {
+            System.out.println("RUN THREAD");
 
-                telemetrySock = new DatagramSocket(telemetryPort);
+            DatagramPacket receivePacket = new DatagramPacket(telemetryBuf, telemetryBuf.length);
 
-                DatagramPacket receivePacket = new DatagramPacket(telemetryBuf, telemetryBuf.length);
+            while (telemetryActive && !telemetrySock.isClosed()) {
 
-                telemetrySock.receive(receivePacket);
+                try {
 
-                byte[] telemetryResponse = receivePacket.getData();
+                    telemetrySock.receive(receivePacket);
 
-                if (telemetryResponse != null) {
+                    byte[] telemetryResponse = receivePacket.getData();
 
-                    short code = getCode(telemetryResponse);
-                    short size = getSize(telemetryResponse);
-                    byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
+                    if (telemetryResponse != null) {
 
-                    evaluateTelemetry(code, size, data);
+                        short code = getCode(telemetryResponse);
+                        System.out.println("CODE:" + String.valueOf(code));
+                        short size = getSize(telemetryResponse);
+                        byte[] data = Arrays.copyOfRange(telemetryResponse, 3, size + 3);
+
+                        evaluateTelemetry(code, size, data);
+                    }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+
                 }
 
-            } catch (IOException e) {
-                e.printStackTrace();
-
             }
+
         }
 
-        public void start () {
-            System.out.println("Starting telemetry thread...");
-            if (t == null) {
-                t = new Thread (this);
-                t.start ();
-            }
-        }
     }
 }
