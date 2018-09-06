@@ -14,30 +14,30 @@ public class ExecuteClient {
 
     public static void main (String[] args) throws SocketException, UnknownHostException, InterruptedException {
         try(DroneClientServer droneClientServer=new DroneClientServer(new InetSocketAddress(ip,4445))){
-            droneClientServer.setOnTelemetryCallback((telemetryDatagramPacket)->{
-                switch (telemetryDatagramPacket.code){
+            droneClientServer.setOnTelemetryCallback((droneSegment)->{
+                switch (droneSegment.code){
                     case 102:
-                        printRawImu(new DroneClientServer.DroneSegment.RawImu(telemetryDatagramPacket.payload));
+                        printRawImu(new DroneClientServer.DroneSegment.RawImu(droneSegment.payload));
                         break;
                     case 108:
-                        printAttitude(new DroneClientServer.DroneSegment.Attitude(telemetryDatagramPacket.payload));
+                        printAttitude(new DroneClientServer.DroneSegment.Attitude(droneSegment.payload));
                         break;
                     case 105:
-                        printRc(new DroneClientServer.DroneSegment.Rc(telemetryDatagramPacket.payload));
+                        printRc(new DroneClientServer.DroneSegment.Rc(droneSegment.payload));
                         break;
                     case 109:
-                        printAltitude(new DroneClientServer.DroneSegment.Altitude(telemetryDatagramPacket.payload));
+                        printAltitude(new DroneClientServer.DroneSegment.Altitude(droneSegment.payload));
                         break;
                     default:
                         throw new InvalidStateException("Im fucked");
                 }
 
-                System.out.println("CODE: "+telemetryDatagramPacket.code);
-                System.out.println("Size: "+ telemetryDatagramPacket.size);
-                System.out.println("Payload: "+Arrays.toString(telemetryDatagramPacket.payload));
+                System.out.println("CODE: "+droneSegment.code);
+                System.out.println("Size: "+ droneSegment.size);
+                System.out.println("Payload: "+Arrays.toString(droneSegment.payload));
             });
             droneClientServer.start();
-            //dronClientServer.sendArm();
+            //dronClientServer.send Arm();
             droneClientServer.startTelemetry();
             Thread.sleep((long)1000000000);
         } catch (IOException e) {

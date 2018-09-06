@@ -32,6 +32,8 @@ public class DroneClientServer implements AutoCloseable {
         this.startConnection();
     }
 
+    // Defines the behaviour to be executed when the telemetry is active.
+
     public void setOnTelemetryCallback(final Consumer<DroneSegment> onTelemetryCallback) {
         this.onTelemetryCallback = onTelemetryCallback;
     }
@@ -63,6 +65,8 @@ public class DroneClientServer implements AutoCloseable {
 
     }
 
+    // Initializes the communication with the MultiWii Server.
+
     private void startConnection() throws IOException {
         final DatagramPacket datagramPacket=this.generateDatagramPacket((short)300);
 
@@ -77,6 +81,8 @@ public class DroneClientServer implements AutoCloseable {
 
     }
 
+    // Starts the telemetry thread.
+
     public void startTelemetry() throws IOException {
         final DatagramPacket datagramPacket=this.generateDatagramPacket((short)120);
 
@@ -84,17 +90,21 @@ public class DroneClientServer implements AutoCloseable {
             this.datagramSocket.send(datagramPacket);
             this.datagramSocket.receive(datagramPacket);
 
-            if (new DroneSegment(datagramPacket.getData()).code == 122) {
+            if (new DroneSegment(datagramPacket.getData()).code == 121) {
                 this.telemetryStarted = true;
                 this.telemetryThread.start();
             }
         }
     }
 
+    // Stops the telemetry thread.
+
     public void stopTelemetry() throws IOException{
         final DatagramPacket datagramPacket=this.generateDatagramPacket((short)122);
         this.datagramSocket.send(datagramPacket);
     }
+
+    // Method that defines the behaviour of the telemetry thread.
 
     private void onTelemetryThreadRun() {
         while (true){
@@ -112,9 +122,13 @@ public class DroneClientServer implements AutoCloseable {
     }
 
     private void stopConnection() throws IOException {
-        final DatagramPacket datagramPacket=this.generateDatagramPacket((short)301);
+        final DatagramPacket datagramPacket=this.generateDatagramPacket((short)302);
         this.datagramSocket.send(datagramPacket);
     }
+
+    // The two methods above are used to convert the information of a communication package to a datagram package.
+    // The first one is related to the commands that have no data information to be send. The second one is used when
+    // data information is needed.
 
     private DatagramPacket generateDatagramPacket(final short code) {
         return this.generateDatagramPacket(code, (short) 2, new short[]{(short)0});
@@ -137,6 +151,10 @@ public class DroneClientServer implements AutoCloseable {
         public final short size;
 
         public final short[] payload;
+
+        /*Represents the structure of a communication package between the MultiWii client and sever. Requires the code
+        * of the command to be send, the size in bytes of the data, and the data. Is used to easily pack and unpack
+        * the communication packages. */
 
         public DroneSegment(final short code, final short size, final short[] payload){
             this.code=code;
